@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmailStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
+
+model User {
+  id            String      @id @default(cuid())
+  googleId      String?     @unique
+  email         String      @unique
+  name          String
+  avatar        String?
+  slackAccessToken String?
+  slackTeamId   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  emailJobs     EmailJob[]
+  campaigns     Campaign[]
+  sessions      Session[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Campaign {
+  id          String     @id @default(cuid())
+  userId      String
+  subject     String
+  body        String
+  senderEmail String
+  senderName  String?
+  startAt     DateTime
+  delayMs     Int
+  hourlyLimit Int
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails      EmailJob[]
+}
+
+model EmailJob {
+  id           String      @id @default(cuid())
+  campaignId   String
+  userId       String
+  recipient    String
+  subject      String
+  body         String
+  senderEmail  String
+  scheduledAt  DateTime
+  sentAt       DateTime?
+  status       EmailStatus @default(SCHEDULED)
+  attempts     Int         @default(0)
+  messageId    String?
+  previewUrl   String?
+  lastError    String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  campaign     Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([scheduledAt])
+  @@index([recipient])
+}
+
+model RateLimitEvent {
+  id         String   @id @default(cuid())
+  senderKey  String
+  hourWindow String
+  createdAt  DateTime @default(now())
+
+  @@unique([senderKey, hourWindow])
+}
